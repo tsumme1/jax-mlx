@@ -1,0 +1,41 @@
+[build-system]
+requires = ["setuptools>=42", "wheel", "pybind11", "cmake", "mlx"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "jax-mlx"
+version = "0.0.1"
+description = "JAX PJRT plugin for Apple Silicon using MLX"
+readme = "README.md"
+license = {text = "MIT"}
+requires-python = ">=3.11"
+authors = [
+    {name = "Thomas Summe"}
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Environment :: GPU",
+    "Environment :: MacOS X",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: MacOS :: MacOS X",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+keywords = ["jax", "mlx", "apple-silicon", "machine-learning", "pjrt"]
+dependencies = [
+    "jax>=0.5.0",
+    "jaxlib>=0.5.0",
+    "mlx",
+]
+
+[project.urls]
+Homepage = "https://github.com/tsumme1/jax-mlx"
+Repository = "https://github.com/tsumme1/jax-mlx"
+
+[project.entry-points."jax_plugins"]
+mlx_plugin = "jax_mlx.plugin"
