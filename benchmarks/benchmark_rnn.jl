@@ -12,7 +12,13 @@ using Libdl, Reactant, Lux, Enzyme, Random, Statistics
 # ── MLX Plugin Setup ──────────────────────────────────────────────────────────
 
 function load_mlx_plugin!()
-    mlx_lib = "/Users/thomas/miniforge3/envs/jax/lib/python3.13/site-packages/mlx/lib/libmlx.dylib"
+    # Find libmlx.dylib: check MLX_LIB_PATH env var, then ARGS
+    mlx_lib = get(ENV, "MLX_LIB_PATH", nothing)
+    if mlx_lib === nothing && !isempty(ARGS)
+        mlx_lib = ARGS[1]
+    end
+    @assert mlx_lib !== nothing "Set MLX_LIB_PATH or pass path to libmlx.dylib as first argument"
+    @assert isfile(mlx_lib) "Cannot find libmlx.dylib at $mlx_lib"
     Libdl.dlopen(mlx_lib, Libdl.RTLD_NOW | Libdl.RTLD_GLOBAL)
 
     plugin_path = joinpath(@__DIR__, "..", "src", "jax_mlx", "libmlx_pjrt_plugin.dylib")
@@ -26,6 +32,25 @@ function load_mlx_plugin!()
     Reactant.XLA.global_backend_state.clients["mlx"] = mlx_client
     Reactant.XLA.set_default_backend(mlx_client)
     println("MLX plugin loaded ✓")
+end
+
+# Monkey-patch: the PJRT C API wrapper can't deserialize our StableHLO MLIR text
+# into xla::HloModule. Since compile() discards hlo_modules anyway, a try/catch
+# fallback is safe. This overrides the precompiled method via Julia's invalidation.
+function Reactant.XLA.get_hlo_modules(exec::Reactant.XLA.PJRT.LoadedExecutable)
+    hlo_modules = Ref{NTuple{Int64(Reactant.XLA.num_partitions(exec)),Ptr{Cvoid}}}()
+    nmodules = Ref{Int32}(0)
+    try
+        GC.@preserve exec hlo_modules begin
+            @ccall Reactant.MLIR.API.mlir_c.PjRtLoadedExecutableGetHloModules(
+                exec.exec::Ptr{Cvoid}, hlo_modules::Ptr{Ptr{Cvoid}}, nmodules::Ptr{Cint}
+            )::Cvoid
+        end
+        return map(Reactant.XLA.HloModule, hlo_modules[][1:Int(nmodules[])])
+    catch e
+        @warn "get_hlo_modules failed (expected for MLX plugin)" exception = e
+        return Reactant.XLA.HloModule[]
+    end
 end
 
 # ── 2-Layer Manual GRU ────────────────────────────────────────────────────────
